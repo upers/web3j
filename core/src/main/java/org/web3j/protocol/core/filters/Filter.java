@@ -11,14 +11,14 @@ import java.util.concurrent.TimeUnit;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import org.web3j.protocol.Web3j;
-
 import org.web3j.protocol.core.Request;
 import org.web3j.protocol.core.Response;
 import org.web3j.protocol.core.methods.response.EthFilter;
 import org.web3j.protocol.core.methods.response.EthLog;
 import org.web3j.protocol.core.methods.response.EthUninstallFilter;
+
+import rx.Subscriber;
 
 
 /**
@@ -40,7 +40,7 @@ public abstract class Filter<T> {
         this.callback = callback;
     }
 
-    public void run(ScheduledExecutorService scheduledExecutorService, long blockTime) {
+    public void run(ScheduledExecutorService scheduledExecutorService, Subscriber<?> subscriber, long blockTime) {
         try {
             EthFilter ethFilter = sendRequest();
             if (ethFilter.hasError()) {
@@ -77,6 +77,7 @@ public abstract class Filter<T> {
                             // All exceptions must be caught, otherwise our job terminates without
                             // any notification
                             log.error("Error sending request", e);
+                            subscriber.onError(e);
                         }
                     },
                     0, blockTime, TimeUnit.MILLISECONDS);
@@ -122,20 +123,17 @@ public abstract class Filter<T> {
 
     public void cancel() {
         schedule.cancel(false);
-
-        EthUninstallFilter ethUninstallFilter = null;
         try {
-            ethUninstallFilter = web3j.ethUninstallFilter(filterId).send();
+        	EthUninstallFilter ethUninstallFilter = web3j.ethUninstallFilter(filterId).send();
+            if (ethUninstallFilter.hasError()) {
+                throwException(ethUninstallFilter.getError());
+            }
+
+            if (!ethUninstallFilter.isUninstalled()) {
+                throwException(ethUninstallFilter.getError());
+            }
         } catch (IOException e) {
-            throwException(e);
-        }
-
-        if (ethUninstallFilter.hasError()) {
-            throwException(ethUninstallFilter.getError());
-        }
-
-        if (!ethUninstallFilter.isUninstalled()) {
-            throwException(ethUninstallFilter.getError());
+        	log.error(e.getMessage(), e);
         }
     }
 

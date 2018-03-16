@@ -70,7 +70,7 @@ public class JsonRpc2_0Rx {
             org.web3j.protocol.core.filters.Filter<T> filter, Subscriber<? super T> subscriber,
             long pollingInterval) {
 
-        filter.run(scheduledExecutorService, pollingInterval);
+        filter.run(scheduledExecutorService, subscriber, pollingInterval);
         subscriber.add(Subscriptions.create(filter::cancel));
     }
 
